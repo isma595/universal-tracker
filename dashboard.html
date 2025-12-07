@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Universal Tracker Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --bg: #f3f4f6;
+            --card-bg: #ffffff;
+            --text: #1f2937;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            margin-bottom: 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        h1 {
+            font-weight: 800;
+            color: #111;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            padding: 1.5rem;
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-value {
+            font-size: 3rem;
+            font-weight: 800;
+            color: var(--primary);
+        }
+
+        .stat-label {
+            color: #6b7280;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 1rem;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        th {
+            font-weight: 600;
+            color: #6b7280;
+            background: #f9fafb;
+        }
+
+        .status-dot {
+            height: 10px;
+            width: 10px;
+            background-color: #10b981;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
+        }
+
+        button {
+            padding: 0.5rem 1rem;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #1d4ed8;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>Universal Cart Tracker</h1>
+            <div><span class="status-dot"></span> Système Actif</div>
+        </header>
+
+        <div class="grid">
+            <div class="card">
+                <div class="stat-label">Total Ajouts au Panier</div>
+                <div class="stat-value" id="total-count">-</div>
+            </div>
+            <div class="card">
+                <div class="stat-label">Valeur Totale Estimée</div>
+                <div class="stat-value" id="total-value" style="color: #059669">- €</div>
+            </div>
+        </div>
+
+        <div class="grid">
+            <div class="card">
+                <h3>Produits Populaires</h3>
+                <canvas id="productsChart"></canvas>
+            </div>
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3>Activité Récente</h3>
+                    <button onclick="downloadCSV()">📥 Exporter CSV</button>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table id="events-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Site (Domaine)</th>
+                                <th>Produit</th>
+                                <th>Prix</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const KVDB_URL = "https://kvdb.io/3kS2y2m5M8a5x3n1/events";
+
+        async function fetchData() {
+            try {
+                const res = await fetch(KVDB_URL);
+                if (res.status === 404) {
+                    renderDashboard([]);
+                    return;
+                }
+                const text = await res.text();
+                const events = text ? JSON.parse(text) : [];
+                window.allEvents = events;
+                renderDashboard(events);
+            } catch (e) {
+                console.error("Error fetching stats:", e);
+            }
+        }
+
+        function renderDashboard(events) {
+            document.getElementById('total-count').innerText = events.length;
+
+            const totalVal = events.reduce((acc, curr) => acc + parseFloat(curr.price || 0), 0);
+            document.getElementById('total-value').innerText = totalVal.toFixed(2) + ' €';
+
+            const sortedEvents = [...events].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            const tbody = document.querySelector('#events-table tbody');
+            tbody.innerHTML = '';
+            sortedEvents.slice(0, 10).forEach(ev => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${new Date(ev.timestamp).toLocaleString()}</td>
+                    <td>${ev.domain}</td>
+                    <td><b>${ev.product}</b></td>
+                    <td>${ev.price} €</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            const productCounts = events.reduce((acc, curr) => {
+                acc[curr.product] = (acc[curr.product] || 0) + 1;
+                return acc;
+            }, {});
+
+            const ctx = document.getElementById('productsChart').getContext('2d');
+            if (window.myChart) window.myChart.destroy();
+
+            window.myChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(productCounts),
+                    datasets: [{
+                        data: Object.values(productCounts),
+                        backgroundColor: ['#4f46e5', '#ec4899', '#10b981', '#f59e0b', '#6366f1']
+                    }]
+                }
+            });
+        }
+
+        function downloadCSV() {
+            if (!window.allEvents || window.allEvents.length === 0) {
+                alert("Aucune donnée à exporter.");
+                return;
+            }
+
+            const headers = ["Date", "Domaine", "Produit", "Prix"];
+            const rows = window.allEvents.map(e => [
+                new Date(e.timestamp).toLocaleString(),
+                e.domain,
+                e.product,
+                e.price
+            ]);
+
+            const csvContent = [
+                headers.join(";"),
+                ...rows.map(row => row.map(item => `"${item}"`).join(";"))
+            ].join("\n");
+
+            const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", `cart_export_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        fetchData();
+        setInterval(fetchData, 5000);
+    </script>
+</body>
+
+</html>
