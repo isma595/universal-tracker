@@ -31,18 +31,37 @@
         let name = "Unknown Product";
         let price = "0";
 
+        // Get product name from h1
         const h1 = document.querySelector('h1');
         if (h1) name = h1.innerText.trim();
 
-        const priceElement = document.querySelector('.price, .product-price, .money, .current-price');
+        // Try multiple price selectors (Muneera uses specific classes)
+        const priceSelectors = [
+            '.price',
+            '.product-price',
+            '.money',
+            '.current-price',
+            '[class*="price"]',
+            '[class*="Prix"]'
+        ];
+
+        let priceElement = null;
+        for (const selector of priceSelectors) {
+            priceElement = document.querySelector(selector);
+            if (priceElement) break;
+        }
+
         if (priceElement) {
             price = cleanPrice(priceElement.innerText);
         } else {
+            // Fallback: search for price pattern in page text
+            // Look for patterns like "29,99 €" or "29.99€"
             const bodyText = document.body.innerText;
-            const priceMatch = bodyText.match(/(\d+[.,]\d{2})\s?€/);
+            const priceMatch = bodyText.match(/(\d+[.,]\d{2})\s*€/);
             if (priceMatch) price = cleanPrice(priceMatch[1]);
         }
 
+        console.log("Scraped product:", { name, price });
         return { name, price };
     }
 
