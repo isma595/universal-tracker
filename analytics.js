@@ -1,7 +1,7 @@
 (function () {
     console.log("Universal Tracker Initialized (Smart Mode)");
 
-    const KVDB_URL = "https://kvdb.io/3kS2y2m5M8a5x3n1/events";
+    const KVDB_URL = "https://kvdb.io/H9jpDJgn5H27GS8fLZcXwp/events";
 
     function init() {
         document.addEventListener('click', function (e) {
