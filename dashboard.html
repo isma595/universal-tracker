@@ -115,7 +115,7 @@
     <div class="container">
         <header>
             <h1>Universal Cart Tracker</h1>
-            <div><span class="status-dot"></span> Système Actif</div>
+            <div><span class="status-dot"></span> Système Connecté (JSONBin)</div>
         </header>
 
         <div class="grid">
@@ -157,17 +157,29 @@
     </div>
 
     <script>
-        const KVDB_URL = "https://kvdb.io/H9jpDJgn5H27GS8fLZcXwp/events";
+        const BIN_ID = "693623f243b1c97be9de9fb9";
+        const API_KEY = "$2a$10$U0a6/cNNJLnse/Et4gmhseuynJnqHMgp6.hmVe13pRHtnmGAyEWCG";
+        const BIN_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
 
         async function fetchData() {
             try {
-                const res = await fetch(KVDB_URL);
-                if (res.status === 404) {
-                    renderDashboard([]);
-                    return;
+                const res = await fetch(BIN_URL, {
+                    headers: {
+                        'X-Master-Key': API_KEY,
+                        'X-Access-Key': API_KEY
+                    }
+                });
+
+                let events = [];
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.record && Array.isArray(data.record.events)) {
+                        events = data.record.events;
+                    } else if (Array.isArray(data.record)) {
+                        events = data.record;
+                    }
                 }
-                const text = await res.text();
-                const events = text ? JSON.parse(text) : [];
+
                 window.allEvents = events;
                 renderDashboard(events);
             } catch (e) {
