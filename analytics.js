@@ -1,7 +1,9 @@
 (function () {
-    console.log("Universal Tracker Initialized (Smart Mode)");
+    console.log("Universal Tracker Initialized (JSONBin Mode)");
 
-    const KVDB_URL = "https://kvdb.io/H9jpDJgn5H27GS8fLZcXwp/events";
+    const BIN_ID = "693623f243b1c97be9de9fb9";
+    const API_KEY = "$2a$10$U0a6/cNNJLnse/Et4gmhseuynJnqHMgp6.hmVe13pRHtnmGAyEWCG";
+    const BIN_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
 
     function init() {
         document.addEventListener('click', function (e) {
@@ -35,7 +37,7 @@
         const h1 = document.querySelector('h1');
         if (h1) name = h1.innerText.trim();
 
-        // Try multiple price selectors (Muneera uses specific classes)
+        // Try multiple price selectors
         const priceSelectors = [
             '.price',
             '.product-price',
@@ -55,7 +57,6 @@
             price = cleanPrice(priceElement.innerText);
         } else {
             // Fallback: search for price pattern in page text
-            // Look for patterns like "29,99 €" or "29.99€"
             const bodyText = document.body.innerText;
             const priceMatch = bodyText.match(/(\d+[.,]\d{2})\s*€/);
             if (priceMatch) price = cleanPrice(priceMatch[1]);
@@ -82,11 +83,22 @@
 
         try {
             // Get existing events
-            const res = await fetch(KVDB_URL);
+            const res = await fetch(BIN_URL, {
+                headers: {
+                    'X-Master-Key': API_KEY,
+                    'X-Access-Key': API_KEY
+                }
+            });
+
             let events = [];
-            if (res.status !== 404) {
-                const text = await res.text();
-                events = text ? JSON.parse(text) : [];
+            if (res.ok) {
+                const data = await res.json();
+                // Check if data is wrapped in record.events (our structure) or just record (raw array)
+                if (data.record && Array.isArray(data.record.events)) {
+                    events = data.record.events;
+                } else if (Array.isArray(data.record)) {
+                    events = data.record;
+                }
             }
 
             // Add new event
@@ -94,9 +106,13 @@
             if (events.length > 100) events.shift();
 
             // Save back
-            await fetch(KVDB_URL, {
-                method: 'POST',
-                body: JSON.stringify(events)
+            await fetch(BIN_URL, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Master-Key': API_KEY
+                },
+                body: JSON.stringify({ events: events })
             });
 
             console.log("Event tracked successfully");
