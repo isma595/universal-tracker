@@ -71,12 +71,15 @@
     }
 
     async function trackEvent(product, price) {
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
         const payload = {
             id: Date.now(),
             timestamp: new Date().toISOString(),
             domain: window.location.hostname,
             product: product,
-            price: price
+            price: price,
+            device: isMobile ? 'mobile' : 'desktop'
         };
 
         console.log("Sending Event:", payload);
